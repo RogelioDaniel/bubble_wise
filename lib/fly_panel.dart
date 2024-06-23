@@ -247,7 +247,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
 
   Future _geminiAPI(String currentWords) async {
     final prompt = TextPart(
-        "Vas a recibir una oracion despues del simbolo % y me vas a dar a indicar si la oracione es correcta gramaticalmente con un true or false entre [], y quiero que despues me des una oracion alternativa si la oracion original es false, si no recibes nada despues del % no hagas mi peticion : " +
+        "Vas a recibir una oracion despues del simbolo % y me vas a dar a indicar si la oracione es correcta gramaticalmente ( tambien agrega sentido comun, la oracion no tienen que ser la misma que me puedas dar, y los signos no cuenta, quiero que sea mas enfocado al significado) con un true or false entre [], y quiero que despues me des una oracion alternativa si la oracion original es false, si no recibes nada despues del % no hagas mi peticion : " +
             '%' +
             currentWords);
 
@@ -260,6 +260,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
     final RegExp regex = RegExp(r'\[(true|false)\]');
     final match = regex.firstMatch(responseAux)?.group(0);
     print(match);
+    return match;
   }
 
   Future _stopListening() async {
@@ -326,6 +327,8 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
   }
 
   void statusListener(String status) async {
+    bool apiResponse = false;
+    String validatorResponse = '';
     _logEvent(
         'Received listener status: $status, listening: ${speech.isListening}');
     debugPrint("status $status");
@@ -337,7 +340,47 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
         _currentWords = "";
         _speechEnabled = false;
       });
-      await _geminiAPI(_auxCurrentWords);
+      //await _geminiAPI(_auxCurrentWords);
+      // Mostrar el diálogo mientras se ejecuta la función _geminiAPI
+// Mostrar el diálogo
+      // Esperar 3 segundos y cerrar el diálogo
+      Future.delayed(Duration(seconds: 3), () {
+        Navigator.of(context, rootNavigator: true).pop();
+      });
+
+      try {
+        validatorResponse = await _geminiAPI(_auxCurrentWords) ?? '[false]';
+        if (validatorResponse == '[true]') {
+          apiResponse = true;
+        } else {
+          apiResponse = false;
+        }
+      } finally {}
+
+      showDialog(
+        context: context,
+        barrierDismissible:
+            false, // Evita que el usuario cierre el diálogo al tocar fuera de él
+        builder: (BuildContext context) {
+          return AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Expanded(
+                  child: Text(
+                    apiResponse ? "true" : "false",
+                    style: TextStyle(
+                      color: apiResponse ? Colors.green : Colors.red,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
       await startListening();
     }
   }
