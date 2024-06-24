@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:bubble_wise/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
@@ -48,10 +49,8 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
   final SpeechToText speech = SpeechToText();
   RingerModeStatus _soundMode = RingerModeStatus.unknown;
   String? _permissionStatus;
-  String? apiKey = Platform.environment['API_KEY'];
 
-  final model = GenerativeModel(
-      model: 'gemini-pro', apiKey: 'AIzaSyAZSVck9kvJEZ9RS1rX_dRiaRkiUKaWSJs');
+  final model = GenerativeModel(model: 'gemini-pro', apiKey: apiKey);
 
   @override
   void initState() {
@@ -93,6 +92,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
         _hasSpeech = false;
       });
     }
+    print(apiKey);
   }
 
   Future<void> _getCurrentSoundMode() async {
@@ -247,7 +247,9 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
 
   Future _geminiAPI(String currentWords) async {
     final prompt = TextPart(
-        "Vas a recibir una oracion despues del simbolo % y me vas a dar a indicar si la oracione es correcta gramaticalmente ( tambien agrega sentido comun, la oracion no tienen que ser la misma que me puedas dar, y los signos no cuenta, quiero que sea mas enfocado al significado) con un true or false entre [], y quiero que despues me des una oracion alternativa si la oracion original es false, si no recibes nada despues del % no hagas mi peticion : " +
+        "Vas a recibir dos cosas, las iniciales del pais e idioma en el que trabajaras despues del simbolo & y una oracion despues del simbolo % y me vas a dar a indicar si la oracione es correcta gramaticalmente ( tambien agrega sentido comun, la oracion no tienen que ser la misma que me puedas dar, y los signos no cuenta, quiero que sea mas enfocado al significado) con un true or false entre [], y quiero que despues me des una oracion alternativa si la oracion original es false, si no recibes nada despues del % no hagas mi peticion : " +
+            '&' +
+            _currentLocaleId +
             '%' +
             currentWords);
 
@@ -344,9 +346,6 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
       // Mostrar el diálogo mientras se ejecuta la función _geminiAPI
 // Mostrar el diálogo
       // Esperar 3 segundos y cerrar el diálogo
-      Future.delayed(Duration(seconds: 3), () {
-        Navigator.of(context, rootNavigator: true).pop();
-      });
 
       try {
         validatorResponse = await _geminiAPI(_auxCurrentWords) ?? '[false]';
@@ -357,7 +356,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
         }
       } finally {}
 
-      showDialog(
+      await showDialog(
         context: context,
         barrierDismissible:
             false, // Evita que el usuario cierre el diálogo al tocar fuera de él
@@ -369,7 +368,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
                 SizedBox(width: 20),
                 Expanded(
                   child: Text(
-                    apiResponse ? "true" : "false",
+                    apiResponse ? "Frase correcta" : "Frase incorrecta",
                     style: TextStyle(
                       color: apiResponse ? Colors.green : Colors.red,
                     ),
@@ -377,6 +376,14 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
                 ),
               ],
             ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.close),
+                onPressed: () {
+                  Navigator.of(context, rootNavigator: true).pop();
+                },
+              ),
+            ],
           );
         },
       );
