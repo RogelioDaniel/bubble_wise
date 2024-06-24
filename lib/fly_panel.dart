@@ -92,7 +92,6 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
         _hasSpeech = false;
       });
     }
-    print(apiKey);
   }
 
   Future<void> _getCurrentSoundMode() async {
