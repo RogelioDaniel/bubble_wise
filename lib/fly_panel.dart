@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:bubble_wise/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sound_mode/permission_handler.dart';
@@ -50,7 +51,15 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
   RingerModeStatus _soundMode = RingerModeStatus.unknown;
   String? _permissionStatus;
 
-  final model = GenerativeModel(model: 'gemini-pro', apiKey: apiKey);
+  final model = GenerativeModel(
+      model: 'gemini-1.5-pro',
+      apiKey: apiKey,
+      generationConfig: GenerationConfig(
+          temperature: 0.9,
+          topK: 64,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+          responseMimeType: "text/plain"));
 
   @override
   void initState() {
@@ -155,7 +164,17 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Speech to Text Example'),
+          title: const Text('Bubble wise'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                stopListening();
+                FlutterOverlayWindow.closeOverlay()
+                    .then((value) => log('STOPPED: alue: $value' as num));
+              },
+            ),
+          ],
         ),
         body: SingleChildScrollView(
           child: Column(
@@ -244,24 +263,41 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
     });
   }
 
-  Future _geminiAPI(String currentWords) async {
-    final prompt = TextPart(
-        "Vas a recibir dos cosas, las iniciales del pais e idioma en el que trabajaras despues del simbolo & y una oracion despues del simbolo % y me vas a dar a indicar si la oracione es correcta gramaticalmente ( tambien agrega sentido comun, la oracion no tienen que ser la misma que me puedas dar, y los signos no cuenta, quiero que sea mas enfocado al significado) con un true or false entre [], y quiero que despues me des una oracion alternativa si la oracion original es false, si no recibes nada despues del % no hagas mi peticion : " +
-            '&' +
-            _currentLocaleId +
-            '%' +
-            currentWords);
-
-    final response = await model.generateContent([
-      Content.multi([prompt])
+  Future<List<String>> _geminiAPI(String currentWords) async {
+    // final prompt = TextPart(
+    //   "You will receive two elements: the initials of the country and the language in which you will be working after the & symbol, and a sentence after the % symbol. Your task is to indicate if the sentence is grammatically correct. Punctuation marks do not count. Respond with [true] if the sentence is gramatically correct,  [false] if it is not and [almost] if it's gramaticaly correct but you can use another natural or better way to say that. If the sentence is incorrect, just provide an improved example of that sentence. If you do not receive anything after the %, do not make any corrections:" +
+    //       '& ' +
+    //       _currentLocaleId +
+    //       '% ' +
+    //       currentWords,
+    // );
+    // Initialize the chat
+    final chat = model.startChat(history: [
+      Content.model([
+        TextPart(
+          "You will receive two elements: the initials of the country and the language in which you will be working after the & symbol, and a sentence after the % symbol. Your task is to indicate if the sentence is grammatically and contextually correct. Punctuation marks do not count. Respond with [true] if the sentence is gramatically correct,  [false] if it is not and [almost] if it's gramaticaly correct but you can use another natural or better way to say that, after every [] you will do a give the alternative sentence in a new line. If the sentence is incorrect, just provide an improved example of that sentence. If sentence is correct, just provided an another way to say. If you do not receive anything after the %, do not make any corrections:" +
+              '& ' +
+              _currentLocaleId +
+              '% ' +
+              currentWords,
+        )
+      ])
     ]);
-    print(currentWords);
-    print(response.text);
-    String? responseAux = response.text ?? '';
+    // final response = await model.generateContent([
+    //   Content.multi([prompt]),
+    // ]);
+    var content = Content.text(currentWords);
+    var response2 = await chat.sendMessage(content);
+    // String responseAux = response.text ?? '';
+    print(_auxCurrentWords);
     final RegExp regex = RegExp(r'\[(true|false)\]');
-    final match = regex.firstMatch(responseAux)?.group(0);
-    print(match);
-    return match;
+    final match = regex.firstMatch(response2.text ?? '')?.group(0) ?? '';
+
+    return [match, response2.text ?? ''];
+  }
+
+  void _geminiAPIInitialize() async {
+    final prompt = TextPart("");
   }
 
   Future _stopListening() async {
@@ -328,8 +364,11 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
   }
 
   void statusListener(String status) async {
-    bool apiResponse = false;
     String validatorResponse = '';
+
+    String match = '';
+    String responseText = '';
+    bool apiResponse = false;
     _logEvent(
         'Received listener status: $status, listening: ${speech.isListening}');
     debugPrint("status $status");
@@ -345,33 +384,67 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
       // Mostrar el diálogo mientras se ejecuta la función _geminiAPI
 // Mostrar el diálogo
       // Esperar 3 segundos y cerrar el diálogo
-
       try {
-        validatorResponse = await _geminiAPI(_auxCurrentWords) ?? '[false]';
-        if (validatorResponse == '[true]') {
-          apiResponse = true;
-        } else {
-          apiResponse = false;
-        }
+        List<String> response = await _geminiAPI(_auxCurrentWords);
+        match = response[0];
+        responseText = response[1];
+        apiResponse = match == '[true]';
       } finally {}
-
       await showDialog(
         context: context,
         barrierDismissible:
             false, // Evita que el usuario cierre el diálogo al tocar fuera de él
         builder: (BuildContext context) {
           return AlertDialog(
-            content: Row(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 20),
-                Expanded(
-                  child: Text(
-                    apiResponse ? "Frase correcta" : "Frase incorrecta",
-                    style: TextStyle(
-                      color: apiResponse ? Colors.green : Colors.red,
+                Row(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(width: 20),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            apiResponse ? Icons.check_circle : Icons.cancel,
+                            color: apiResponse ? Colors.green : Colors.red,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            apiResponse
+                                ? "Correct sentence"
+                                : "Incorrect sentence",
+                            style: TextStyle(
+                              color: apiResponse ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                Text(
+                  "Your sentence was: " + _auxCurrentWords,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 20),
+                Text(
+                  apiResponse ? responseText : responseText,
+                  style: TextStyle(
+                    color: apiResponse ? Colors.green : Colors.red,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                Divider(
+                  color: Colors.grey,
+                  thickness: 1,
                 ),
               ],
             ),
@@ -636,42 +709,42 @@ class SessionOptionsWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-                Column(
-                  children: [
-                    const Text('pauseFor: '),
-                    Container(
-                      padding: const EdgeInsets.only(left: 8),
-                      width: 80,
-                      child: TextFormField(
-                        controller: pauseForController,
-                      ),
-                    ),
-                    Container(
-                        padding: const EdgeInsets.only(left: 16),
-                        child: const Text('listenFor: ')),
-                    Container(
-                      padding: const EdgeInsets.only(left: 8),
-                      width: 80,
-                      child: TextFormField(
-                        controller: listenForController,
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  children: [
-                    const Text('On device: '),
-                    Checkbox(
-                      value: onDevice,
-                      onChanged: switchOnDevice,
-                    ),
-                    const Text('Log events: '),
-                    Checkbox(
-                      value: logEvents,
-                      onChanged: switchLogging,
-                    ),
-                  ],
-                ),
+                //     Column(
+                //       children: [
+                //         const Text('pauseFor: '),
+                //         Container(
+                //           padding: const EdgeInsets.only(left: 8),
+                //           width: 80,
+                //           child: TextFormField(
+                //             controller: pauseForController,
+                //           ),
+                //         ),
+                //         Container(
+                //             padding: const EdgeInsets.only(left: 16),
+                //             child: const Text('listenFor: ')),
+                //         Container(
+                //           padding: const EdgeInsets.only(left: 8),
+                //           width: 80,
+                //           child: TextFormField(
+                //             controller: listenForController,
+                //           ),
+                //         ),
+                //       ],
+                //     ),
+                //     Column(
+                //       children: [
+                //         const Text('On device: '),
+                //         Checkbox(
+                //           value: onDevice,
+                //           onChanged: switchOnDevice,
+                //         ),
+                //         const Text('Log events: '),
+                //         Checkbox(
+                //           value: logEvents,
+                //           onChanged: switchLogging,
+                //         ),
+                //       ],
+                //     ),
               ],
             );
           } else {
@@ -696,42 +769,42 @@ class SessionOptionsWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-                Row(
-                  children: [
-                    const Text('pauseFor: '),
-                    Container(
-                      padding: const EdgeInsets.only(left: 8),
-                      width: 80,
-                      child: TextFormField(
-                        controller: pauseForController,
-                      ),
-                    ),
-                    Container(
-                        padding: const EdgeInsets.only(left: 16),
-                        child: const Text('listenFor: ')),
-                    Container(
-                      padding: const EdgeInsets.only(left: 8),
-                      width: 80,
-                      child: TextFormField(
-                        controller: listenForController,
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    const Text('On device: '),
-                    Checkbox(
-                      value: onDevice,
-                      onChanged: switchOnDevice,
-                    ),
-                    const Text('Log events: '),
-                    Checkbox(
-                      value: logEvents,
-                      onChanged: switchLogging,
-                    ),
-                  ],
-                ),
+                // Row(
+                //   children: [
+                //     const Text('pauseFor: '),
+                //     Container(
+                //       padding: const EdgeInsets.only(left: 8),
+                //       width: 80,
+                //       child: TextFormField(
+                //         controller: pauseForController,
+                //       ),
+                //     ),
+                //     Container(
+                //         padding: const EdgeInsets.only(left: 16),
+                //         child: const Text('listenFor: ')),
+                //     Container(
+                //       padding: const EdgeInsets.only(left: 8),
+                //       width: 80,
+                //       child: TextFormField(
+                //         controller: listenForController,
+                //       ),
+                //     ),
+                //   ],
+                // ),
+                // Row(
+                //   children: [
+                //     const Text('On device: '),
+                //     Checkbox(
+                //       value: onDevice,
+                //       onChanged: switchOnDevice,
+                //     ),
+                //     const Text('Log events: '),
+                //     Checkbox(
+                //       value: logEvents,
+                //       onChanged: switchLogging,
+                //     ),
+                //   ],
+                // ),
               ],
             );
           }

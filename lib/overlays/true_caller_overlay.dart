@@ -57,7 +57,7 @@ class _TrueCallerOverlayState extends State<TrueCallerOverlay> {
                 log("Overlay Position: $value");
               });
             },
-            child: SpeechSampleApp(),
+            child: const SpeechSampleApp(),
           ),
         ),
       ),
