@@ -176,56 +176,70 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
             ),
           ],
         ),
-        body: SingleChildScrollView(
-          child: Column(
-            children: [
-              const HeaderWidget(),
-              Column(
-                children: <Widget>[
-                  InitSpeechWidget(_hasSpeech, initSpeechState),
-                  SpeechControlWidget(
-                    _hasSpeech,
-                    speech.isListening,
-                    startListening,
-                    stopListening,
-                    cancelListening,
-                  ),
-                  SessionOptionsWidget(
-                    _currentLocaleId,
-                    _switchLang,
-                    _localeNames,
-                    _logEvents,
-                    _switchLogging,
-                    _pauseForController,
-                    _listenForController,
-                    _onDevice,
-                    _switchOnDevice,
-                  ),
-                ],
-              ),
-              SizedBox(
-                height: 400, // Adjust the height as needed
-                child: Column(
-                  children: [
-                    Expanded(
-                      flex: 4,
-                      child: RecognitionResultsWidget(
-                        lastWords: _lastWords,
-                        level: level,
-                        currentWords: _currentWords,
-                        speechAvailable: _speechAvailable,
-                      ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            return Column(
+              children: [
+                const HeaderWidget(),
+                Expanded(
+                  flex: 3,
+                  child: Padding(
+                    padding: EdgeInsets.all(1.0),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            InitSpeechWidget(_hasSpeech, initSpeechState),
+                            SizedBox(height: 5),
+                            SpeechControlWidget(
+                              _hasSpeech,
+                              speech.isListening,
+                              startListening,
+                              stopListening,
+                              cancelListening,
+                            ),
+                            SizedBox(height: 5),
+                            SessionOptionsWidget(
+                              _currentLocaleId,
+                              _switchLang,
+                              _localeNames,
+                              _logEvents,
+                              _switchLogging,
+                              _pauseForController,
+                              _listenForController,
+                              _onDevice,
+                              _switchOnDevice,
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    flex: 4,
+                                    child: RecognitionResultsWidget(
+                                      lastWords: _lastWords,
+                                      level: level,
+                                      currentWords: _currentWords,
+                                      speechAvailable: _speechAvailable,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: SpeechStatusWidget(speech: speech),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                    Expanded(
-                      flex: 1,
-                      child: ErrorWidget(lastError: lastError),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              SpeechStatusWidget(speech: speech),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -264,36 +278,56 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
   }
 
   Future<List<String>> _geminiAPI(String currentWords) async {
-    // final prompt = TextPart(
-    //   "You will receive two elements: the initials of the country and the language in which you will be working after the & symbol, and a sentence after the % symbol. Your task is to indicate if the sentence is grammatically correct. Punctuation marks do not count. Respond with [true] if the sentence is gramatically correct,  [false] if it is not and [almost] if it's gramaticaly correct but you can use another natural or better way to say that. If the sentence is incorrect, just provide an improved example of that sentence. If you do not receive anything after the %, do not make any corrections:" +
-    //       '& ' +
-    //       _currentLocaleId +
-    //       '% ' +
-    //       currentWords,
-    // );
-    // Initialize the chat
-    final chat = model.startChat(history: [
-      Content.model([
-        TextPart(
-          "You will receive two elements: the initials of the country and the language in which you will be working after the & symbol, and a sentence after the % symbol. Your task is to indicate if the sentence is grammatically and contextually correct. Punctuation marks do not count. Respond with [true] if the sentence is gramatically correct,  [false] if it is not and [almost] if it's gramaticaly correct but you can use another natural or better way to say that, after every [] you will do a give the alternative sentence in a new line. If the sentence is incorrect, just provide an improved example of that sentence. If sentence is correct, just provided an another way to say. If you do not receive anything after the %, do not make any corrections:" +
-              '& ' +
-              _currentLocaleId +
-              '% ' +
-              currentWords,
-        )
-      ])
-    ]);
-    // final response = await model.generateContent([
-    //   Content.multi([prompt]),
-    // ]);
-    var content = Content.text(currentWords);
-    var response2 = await chat.sendMessage(content);
-    // String responseAux = response.text ?? '';
-    print(_auxCurrentWords);
-    final RegExp regex = RegExp(r'\[(true|false)\]');
-    final match = regex.firstMatch(response2.text ?? '')?.group(0) ?? '';
+    try {
+      final chat = model.startChat(history: [
+        Content.model([
+          TextPart(
+            "You will receive two elements: the initials of the country and the language in which you will be working after the & symbol, and a sentence after the % symbol. Your task is to indicate if the sentence is grammatically and contextually correct (do not consider commas, periods, accents, question marks, or exclamation marks). Punctuation marks do not count. Respond with [true] if the sentence is grammatically correct, [false] if it is not, and [almost] if it's grammatically correct but you can use other better way to say that(do not consider commas, periods, accents, question marks, or exclamation marks). After every [], provide an alternative sentence in a new line. If the sentence is incorrect, just provide an improved example of that sentence. If the sentence is correct, provide another way to say it. If you do not receive anything after the %, do not make any corrections:" +
+                '& ' +
+                _currentLocaleId +
+                '% ' +
+                currentWords,
+          )
+        ])
+      ]);
 
-    return [match, response2.text ?? ''];
+      var content = Content.text(currentWords);
+      var response2 = await chat.sendMessage(content);
+
+      final RegExp regex = RegExp(r'\[(true|false)\]');
+      final match = regex.firstMatch(response2.text ?? '')?.group(0) ?? '';
+
+      return [match, response2.text ?? ''];
+    } catch (e) {
+      print('Error en la llamada a _geminiAPI: $e');
+      // Mostrar el dialogo de error
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Error'),
+            content:
+                Text('Resources have been exhausted. Please try again later.'),
+            actions: <Widget>[
+              TextButton(
+                child: Text('Cerrar'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+
+      // Cerrar el dialogo automáticamente después de 5 segundos
+      await Future.delayed(Duration(seconds: 5));
+      Navigator.of(context).pop(); // Cierra el dialogo después de 5 segundos
+
+      // Lanza una excepción para indicar que la operación falló
+      throw 'Error en la llamada a _geminiAPI';
+    }
   }
 
   void _geminiAPIInitialize() async {
@@ -396,27 +430,45 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
             false, // Evita que el usuario cierre el diálogo al tocar fuera de él
         builder: (BuildContext context) {
           return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(20.0)),
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   children: [
-                    CircularProgressIndicator(),
                     SizedBox(width: 20),
                     Expanded(
                       child: Row(
                         children: [
                           Icon(
-                            apiResponse ? Icons.check_circle : Icons.cancel,
-                            color: apiResponse ? Colors.green : Colors.red,
+                            match == '[true]'
+                                ? Icons.check_circle
+                                : match == '[false]'
+                                    ? Icons.cancel
+                                    : Icons.warning,
+                            color: match == '[true]'
+                                ? Colors.green
+                                : match == '[false]'
+                                    ? Colors.red
+                                    : Colors.amber,
                           ),
                           SizedBox(width: 10),
                           Text(
-                            apiResponse
+                            match == '[true]'
                                 ? "Correct sentence"
-                                : "Incorrect sentence",
+                                : match == '[false]'
+                                    ? "Incorrect sentence"
+                                    : "Almost correct",
                             style: TextStyle(
-                              color: apiResponse ? Colors.green : Colors.red,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: match == '[true]'
+                                  ? Colors.green
+                                  : match == '[false]'
+                                      ? Colors.red
+                                      : Colors.amber,
                             ),
                           ),
                         ],
@@ -426,9 +478,9 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
                 ),
                 SizedBox(height: 20),
                 Text(
-                  "Your sentence was: " + _auxCurrentWords,
+                  "Your sentence was: $_auxCurrentWords",
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
@@ -436,26 +488,26 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
                 ),
                 SizedBox(height: 20),
                 Text(
-                  apiResponse ? responseText : responseText,
+                  responseText,
                   style: TextStyle(
+                    fontSize: 14,
                     color: apiResponse ? Colors.green : Colors.red,
                   ),
                   textAlign: TextAlign.center,
                 ),
+                SizedBox(height: 20),
                 Divider(
                   color: Colors.grey,
                   thickness: 1,
                 ),
+                IconButton(
+                  icon: Icon(Icons.close),
+                  onPressed: () {
+                    Navigator.of(context, rootNavigator: true).pop();
+                  },
+                ),
               ],
             ),
-            actions: [
-              IconButton(
-                icon: Icon(Icons.close),
-                onPressed: () {
-                  Navigator.of(context, rootNavigator: true).pop();
-                },
-              ),
-            ],
           );
         },
       );
