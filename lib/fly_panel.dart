@@ -88,7 +88,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
         _localeNames = await speech.locales();
 
         var systemLocale = await speech.systemLocale();
-        _currentLocaleId = systemLocale?.localeId ?? '';
+        _currentLocaleId = 'en_US';
       }
       if (!mounted) return;
 
@@ -180,7 +180,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
           builder: (context, constraints) {
             return Column(
               children: [
-                const HeaderWidget(),
+                //const HeaderWidget(),
                 Expanded(
                   flex: 3,
                   child: Padding(
@@ -282,7 +282,7 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
       final chat = model.startChat(history: [
         Content.model([
           TextPart(
-            "You will receive two elements: the initials of the country and the language in which you will be working after the & symbol, and a sentence after the % symbol. Your task is to indicate if the sentence is grammatically and contextually correct (do not consider commas, periods, accents, question marks, or exclamation marks). Punctuation marks do not count. Respond with [true] if the sentence is grammatically correct, [false] if it is not, and [almost] if it's grammatically correct but you can use other better way to say that(do not consider commas, periods, accents, question marks, or exclamation marks). After every [], provide an alternative sentence in a new line. If the sentence is incorrect, just provide an improved example of that sentence. If the sentence is correct, provide another way to say it. If you do not receive anything after the %, do not make any corrections:" +
+            "You will receive two elements: the initials of the country and the language in which you will be working after the & symbol, and a sentence after the % symbol. Your task is to indicate if the sentence is grammatically and contextually correct (do not consider commas, periods, accents, question marks, or exclamation marks). Punctuation marks do not count. Respond with [true] if the sentence is grammatically correct, [false] if it is not, and [almost] f the sentence has 1 grammatical error but is understandable, and you provide the correct sentence (do not consider commas, periods, accents, question marks, or exclamation marks). After every [], provide an alternative sentence in a new line. If the sentence is incorrect, just provide an improved example of that sentence. If the sentence is correct, provide another way to say it. If you do not receive anything after the %, do not make any corrections:" +
                 '& ' +
                 _currentLocaleId +
                 '% ' +
@@ -307,16 +307,14 @@ class _SpeechSampleAppState extends State<SpeechSampleApp> {
         builder: (BuildContext context) {
           return AlertDialog(
             title: Text('Error'),
-            content:
-                Text('Resources have been exhausted. Please try again later.'),
-            actions: <Widget>[
-              TextButton(
-                child: Text('Cerrar'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                    'Resources have been exhausted. Please wait for the window to close and try again.'),
+                SizedBox(height: 20),
+              ],
+            ),
           );
         },
       );
@@ -689,22 +687,88 @@ class SpeechControlWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: <Widget>[
-        TextButton(
-          onPressed: !hasSpeech || isListening ? null : startListening,
-          child: const Text('Start'),
-        ),
-        TextButton(
-          onPressed: isListening ? stopListening : null,
-          child: const Text('Stop'),
-        ),
-        TextButton(
-          onPressed: isListening ? cancelListening : null,
-          child: const Text('Cancel'),
-        )
-      ],
+    return Container(
+      padding: EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.5),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: Offset(0, 3), // changes position of shadow
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          double buttonPadding = constraints.maxWidth *
+              0.04; // 4% del ancho máximo para el relleno de los botones
+          double buttonTextSize = constraints.maxWidth *
+              0.04; // 4% del ancho máximo para el tamaño de fuente
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: <Widget>[
+              ElevatedButton(
+                onPressed: !hasSpeech || isListening ? null : startListening,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    vertical: buttonPadding,
+                    horizontal: buttonPadding *
+                        2, // Doble del relleno vertical para el horizontal
+                  ),
+                ),
+                child: Text(
+                  'Start',
+                  style: TextStyle(fontSize: buttonTextSize),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: isListening ? stopListening : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    vertical: buttonPadding,
+                    horizontal: buttonPadding *
+                        2, // Doble del relleno vertical para el horizontal
+                  ),
+                ),
+                child: Text(
+                  'Stop',
+                  style: TextStyle(fontSize: buttonTextSize),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: isListening ? cancelListening : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    vertical: buttonPadding,
+                    horizontal: buttonPadding *
+                        2, // Doble del relleno vertical para el horizontal
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(fontSize: buttonTextSize),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -739,14 +803,31 @@ class SessionOptionsWidget extends StatelessWidget {
       padding: const EdgeInsets.all(8.0),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          if (constraints.maxWidth < 600) {
-            // Diseño para pantallas pequeñas
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Diseño para pantallas pequeñas
+          return Container(
+            padding: EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.5),
+                  spreadRadius: 2,
+                  blurRadius: 5,
+                  offset: Offset(0, 3), // changes position of shadow
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: <Widget>[
                 Column(
                   children: [
-                    const Text('Language: '),
+                    const Text(
+                      'Language:',
+                      style: TextStyle(
+                          fontSize: 18.0, fontWeight: FontWeight.bold),
+                    ),
                     DropdownButton<String>(
                       onChanged: (selectedVal) => switchLang(selectedVal),
                       value: currentLocaleId,
@@ -761,105 +842,118 @@ class SessionOptionsWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-                //     Column(
-                //       children: [
-                //         const Text('pauseFor: '),
-                //         Container(
-                //           padding: const EdgeInsets.only(left: 8),
-                //           width: 80,
-                //           child: TextFormField(
-                //             controller: pauseForController,
-                //           ),
-                //         ),
-                //         Container(
-                //             padding: const EdgeInsets.only(left: 16),
-                //             child: const Text('listenFor: ')),
-                //         Container(
-                //           padding: const EdgeInsets.only(left: 8),
-                //           width: 80,
-                //           child: TextFormField(
-                //             controller: listenForController,
-                //           ),
-                //         ),
-                //       ],
+                // Column(
+                //   children: [
+                //     const Text(
+                //       'Pause For:',
+                //       style: TextStyle(
+                //           fontSize: 18.0, fontWeight: FontWeight.bold),
                 //     ),
-                //     Column(
+                //     SizedBox(height: 8.0),
+                //     Container(
+                //       padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                //       width: 120,
+                //       child: TextFormField(
+                //         controller: pauseForController,
+                //         decoration: InputDecoration(
+                //           border: OutlineInputBorder(),
+                //           contentPadding: EdgeInsets.symmetric(vertical: 12.0),
+                //         ),
+                //       ),
+                //     ),
+                //     SizedBox(height: 12.0),
+                //     const Text(
+                //       'Listen For:',
+                //       style: TextStyle(
+                //           fontSize: 18.0, fontWeight: FontWeight.bold),
+                //     ),
+                //     SizedBox(height: 8.0),
+                //     Container(
+                //       padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                //       width: 120,
+                //       child: TextFormField(
+                //         controller: listenForController,
+                //         decoration: InputDecoration(
+                //           border: OutlineInputBorder(),
+                //           contentPadding: EdgeInsets.symmetric(vertical: 12.0),
+                //         ),
+                //       ),
+                //     ),
+                //   ],
+                // ),
+                // Column(
+                //   children: [
+                //     Row(
+                //       mainAxisAlignment: MainAxisAlignment.center,
                 //       children: [
-                //         const Text('On device: '),
+                //         Text(
+                //           'On Device:',
+                //           style: TextStyle(
+                //               fontSize: 18.0, fontWeight: FontWeight.bold),
+                //         ),
                 //         Checkbox(
                 //           value: onDevice,
                 //           onChanged: switchOnDevice,
                 //         ),
-                //         const Text('Log events: '),
-                //         Checkbox(
-                //           value: logEvents,
-                //           onChanged: switchLogging,
-                //         ),
                 //       ],
                 //     ),
-              ],
-            );
-          } else {
-            // Diseño para pantallas grandes
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                Row(
-                  children: [
-                    const Text('Language: '),
-                    DropdownButton<String>(
-                      onChanged: (selectedVal) => switchLang(selectedVal),
-                      value: currentLocaleId,
-                      items: localeNames
-                          .map(
-                            (localeName) => DropdownMenuItem(
-                              value: localeName.localeId,
-                              child: Text(localeName.name),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ],
-                ),
-                // Row(
-                //   children: [
-                //     const Text('pauseFor: '),
-                //     Container(
-                //       padding: const EdgeInsets.only(left: 8),
-                //       width: 80,
-                //       child: TextFormField(
-                //         controller: pauseForController,
-                //       ),
-                //     ),
-                //     Container(
-                //         padding: const EdgeInsets.only(left: 16),
-                //         child: const Text('listenFor: ')),
-                //     Container(
-                //       padding: const EdgeInsets.only(left: 8),
-                //       width: 80,
-                //       child: TextFormField(
-                //         controller: listenForController,
-                //       ),
-                //     ),
-                //   ],
-                // ),
-                // Row(
-                //   children: [
-                //     const Text('On device: '),
-                //     Checkbox(
-                //       value: onDevice,
-                //       onChanged: switchOnDevice,
-                //     ),
-                //     const Text('Log events: '),
-                //     Checkbox(
-                //       value: logEvents,
-                //       onChanged: switchLogging,
-                //     ),
+                //     SizedBox(height: 8.0),
+                //     // Row(
+                //     //   mainAxisAlignment: MainAxisAlignment.center,
+                //     //   children: [
+                //     //     Text(
+                //     //       'Log Events:',
+                //     //       style: TextStyle(
+                //     //           fontSize: 18.0, fontWeight: FontWeight.bold),
+                //     //     ),
+                //     //     Checkbox(
+                //     //       value: logEvents,
+                //     //       onChanged: switchLogging,
+                //     //     ),
+                //     //   ],
+                //     // ),
                 //   ],
                 // ),
               ],
-            );
-          }
+            ),
+          );
+
+          // Row(
+          //   children: [
+          //     const Text('pauseFor: '),
+          //     Container(
+          //       padding: const EdgeInsets.only(left: 8),
+          //       width: 80,
+          //       child: TextFormField(
+          //         controller: pauseForController,
+          //       ),
+          //     ),
+          //     Container(
+          //         padding: const EdgeInsets.only(left: 16),
+          //         child: const Text('listenFor: ')),
+          //     Container(
+          //       padding: const EdgeInsets.only(left: 8),
+          //       width: 80,
+          //       child: TextFormField(
+          //         controller: listenForController,
+          //       ),
+          //     ),
+          //   ],
+          // ),
+          // Row(
+          //   children: [
+          //     const Text('On device: '),
+          //     Checkbox(
+          //       value: onDevice,
+          //       onChanged: switchOnDevice,
+          //     ),
+          //     const Text('Log events: '),
+          //     Checkbox(
+          //       value: logEvents,
+          //       onChanged: switchLogging,
+          //     ),
+          //   ],
+          // ),
         },
       ),
     );
@@ -900,17 +994,27 @@ class SpeechStatusWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
-      color: Theme.of(context).colorScheme.background,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.background,
+        borderRadius: BorderRadius.circular(10.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.5),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: Offset(0, 3), // changes position of shadow
+          ),
+        ],
+      ),
       child: Center(
-        child: speech.isListening
-            ? const Text(
-                "I'm listening...",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              )
-            : const Text(
-                'Not listening',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+        child: Text(
+          speech.isListening ? "I'm listening..." : 'Not listening',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18.0,
+            color: speech.isListening ? Colors.green : Colors.red,
+          ),
+        ),
       ),
     );
   }
